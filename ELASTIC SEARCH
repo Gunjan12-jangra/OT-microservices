@@ -1,0 +1,48 @@
+# db server
+sudo nano /etc/systemd/system/elasticsearch.service
+
+# service file for elastic seach
+[Unit]
+Description=Elasticsearch 7.8.0
+Documentation=https://www.elastic.co
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+ExecStart=/home/ubuntu/elasticsearch-7.8.0/bin/elasticsearch
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+LimitNPROC=4096
+TimeoutStartSec=120
+WorkingDirectory=/home/ubuntu/elasticsearch-7.8.0
+Environment=ES_HOME=/home/ubuntu/elasticsearch-7.8.0
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64  # adjust if needed
+
+[Install]
+WantedBy=multi-user.target
+
+-----------
+sudo systemctl daemon-reload
+sudo systemctl enable elasticsearch
+sudo systemctl start elasticsearch
+sudo systemctl status elasticsearch
+
+----------
+
+troubleshoot es
+sudo systemctl stop elasticsearch
+# Double check no processes are running
+ps aux | grep elasticsearch
+rm -rf /home/ubuntu/elasticsearch-7.8.0/data/nodes/0/node.lock
+mkdir -p /home/ubuntu/elasticsearch-7.8.0/data
+sudo chown -R ubuntu:ubuntu /home/ubuntu/elasticsearch-7.8.0/data
+chmod -R 755 /home/ubuntu/elasticsearch-7.8.0/data
+nano /home/ubuntu/elasticsearch-7.8.0/config/elasticsearch.yml
+# yml file content
+network.host: 0.0.0.0       # allows remote access
+http.port: 9200
+path.data: /home/ubuntu/elasticsearch-7.8.0/data
