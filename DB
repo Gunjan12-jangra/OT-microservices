@@ -1,0 +1,123 @@
+1 public subnet
+3 private subnet
+
+
+
+OT microservices
+
+-----syclla setup------
+
+sudo mkdir -p /etc/apt/keyrings
+sudo gpg --homedir /tmp --no-default-keyring --keyring /etc/apt/keyrings/scylladb.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys a43e06657bac99e3
+sudo wget -O /etc/apt/sources.list.d/scylla.list http://downloads.scylladb.com/deb/debian/scylla-2025.4.list
+sudo apt-get update
+sudo apt-get install -y scylla
+sudo scylla_io_setup
+sudo reboot
+sudo systemctl enable scylla-server
+sudo systemctl start scylla-server
+sudo systemctl status scylla-server
+
+
+------postgresql------------
+sudo apt install -y wget gnupg2 lsb-release
+wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+sudo apt update
+sudo apt install -y postgresql-16
+sudo systemctl status postgresql
+
+
+----- redis---------
+
+sudo apt install -y redis-server
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+redis-cli ping
+
+
+---- Attendance Api --------
+
+sudo apt install git -y
+git clone https://github.com/OT-MICROSERVICES/attendance-api.git
+cd attendance-api/
+sudo apt install python3-venv
+python3 -m venv venv
+source venv/bin/activate
+
+#poetry command
+ 
+curl -sSL https://install.python-poetry.org | python3 -
+echo 'export PATH="/home/ubuntu/.local/bin:$PATH"' >> ~/.bashrc
+exec bash
+poetry --version
+poetry install
+poetry add "pyyaml>=6.0.1"
+poetry show
+
+#liquibase
+
+-----java install -----
+sudo apt install openjdk-17-jdk -y
+
+-----liquibase----
+wget -qO- https://repo.liquibase.com/liquibase.asc | sudo tee /etc/apt/trusted.gpg.d/liquibase.asc
+echo "deb https://repo.liquibase.com stable main" | sudo tee /etc/apt/sources.list.d/liquibase.list
+sudo apt update
+sudo apt install liquibase
+
+ssh into Database
+
+mkdir -p scylla-liquibase
+cd scylla-liquibase
+vim liquibase.properties
+cat liquibase.properties
+
+----content----
+changeLogFile=changelog.sql
+url=jdbc:cassandra://10.0.1.25:9042/employee
+driver=com.scylladb.jdbc.Driver
+classpath=/usr/share/java/scylla-jdbc-driver.jar
+logLevel=info
+
+
+cat changelog.sql 
+--liquibase formatted sql
+
+--changeset saarthi:001
+CREATE KEYSPACE IF NOT EXISTS employee
+WITH replication = {
+  'class': 'NetworkTopologyStrategy',
+  'datacenter1': 2
+};
+
+--changeset saarthi:002
+CREATE TABLE IF NOT EXISTS employee.employee_info (
+    id text PRIMARY KEY,
+    joining_date date,
+    address text,
+    department text,
+    designation text,
+    email text,
+    name text,
+    office_location text,
+    phone_number text,
+    status text
+);
+
+--changeset saarthi:003
+CREATE TABLE IF NOT EXISTS employee.employee_salary (
+    id text PRIMARY KEY,
+    name text,
+    process_date date,
+    salary double,
+    status text
+);
+
+mkdir -p lib
+wget https://repo1.maven.org/maven2/com/ing/data/cassandra-jdbc-wrapper/4.6.0/cassandra-jdbc-wrapper-4.6.0.jar
+
+
+
+
+
