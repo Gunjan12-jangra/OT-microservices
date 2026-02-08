@@ -1,0 +1,115 @@
+java install
+
+----- salary api -------
+
+
+# applicaiton.yml of salary api
+
+server:
+  port: 8082
+spring:
+  cassandra:
+    keyspace-name: employee
+    contact-points: 10.0.1.25
+    port: 9042
+    username: scylla
+    password: 12345
+    local-datacenter: datacenter1
+  data:
+    redis:
+      host: 10.0.1.25
+      port: 6379
+      password: 12345
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: [ "health","prometheus", "metrics" ]
+  health:
+    cassandra:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+
+springdoc:
+  swagger-ui:
+    path: /salary-documentation
+    tryItOutEnabled: true
+    filter: true
+  api-docs:
+    path: /salary-api-docs
+  show-actuator: true
+  
+mvn clean install -DskipTests
+java -jar target/salary-0.1.0-RELEASE.jar --help
+path test - curl http://10.0.2.75:8082/actuator/health
+
+# Makefile for salary
+
+APP_VERSION ?= v0.1.0
+IMAGE_REGISTRY ?= quay.io/opstree
+IMAGE_NAME ?= salary-api
+
+# Build salary api
+build:
+	mvn clean package
+
+# Run checkstyle against code
+fmt:
+	mvn checkstyle:checkstyle
+
+# Run jacoco test cases for coverage
+test:
+	mvn test
+
+docker-build:
+	docker build -t ${IMAGE_REGISTRY}/${IMAGE_NAME}:${APP_VERSION} -f Dockerfile .
+
+docker-push:
+	docker push ${IMAGE_REGISTRY}/${IMAGE_NAME}:${APP_VERSION}
+
+run-migrations:
+	migrate -path migration -database "cassandra://10.0.1.25:9042/employee?username=scylla&password=12345" up
+	
+
+DROP TABLE schema_migrations;
+describe tables;
+
+sudo nano /etc/systemd/system/salary-api.service
+
+# salary api service file
+[Unit]
+Description=Salary API Spring Boot Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/salary/salary-api
+ExecStart=/usr/bin/java -jar target/salary-0.1.0-RELEASE.jar --server.port=8082
+SuccessExitStatus=143
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl start salary-api
+sudo systemctl enable salary-api
+sudo systemctl status salary-api
+ss -tulpn | grep 8082
+
+# create record for salary
+curl 
+http://10.0.2.75:8082/api/v1/salary/create/record
