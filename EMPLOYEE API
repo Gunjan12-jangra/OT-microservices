@@ -1,0 +1,115 @@
+------- employee api--------
+
+cat /var/lib/scylla/conf/scylla.yaml
+
+# scyla config file
+# ================================
+# Scylla single-node configuration
+# ================================
+
+cluster_name: 'Test Cluster'
+
+# =================================
+# Authentication & Authorization
+# =================================
+# Enable password login and role-based permissions
+authenticator: PasswordAuthenticator
+authorizer: CassandraAuthorizer
+
+# =================================
+# Network settings
+# =================================
+listen_address: 10.0.1.25          # Node's private IP
+rpc_address: 0.0.0.0               # Listen on all interfaces
+broadcast_rpc_address: 10.0.1.25   # Node’s IP for clients
+
+# =================================
+# Seed nodes (for cluster discovery)
+# =================================
+seed_provider:
+  - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+    parameters:
+      - seeds: "10.0.1.25"
+
+# =================================
+# Directories
+# =================================
+data_file_directories:
+  - /var/lib/scylla/data
+commitlog_directory: /var/lib/scylla/commitlog
+saved_caches_directory: /var/lib/scylla/saved_caches
+hints_directory: /var/lib/scylla/hints
+
+# =================================
+# API (optional)
+# =================================
+api_address: 10.0.1.25
+
+# =================================
+# Other settings
+# =================================
+endpoint_snitch: SimpleSnitch
+incremental_backups: false
+listen_interface: eth0
+
+cqlsh -u cassandra -p cassandra
+CREATE ROLE scylla WITH PASSWORD = '12345' AND LOGIN = true;
+cassandra@cqlsh> GRANT ALL PERMISSIONS ON KEYSPACE employee TO scylla;
+cassandra@cqlsh> list all permissions on keyspace employee;
+cqlsh -u scylla -p 12345
+
+# api config.yml
+scylladb:
+  host: ["10.0.1.25:9042"]
+  username: scylla 
+  password: 12345
+  keyspace: employee
+
+redis:
+  enabled: false
+  host: 10.0.1.25:6379
+  password: 12345
+  database: 0
+  
+# migrate.json root
+{
+  "database": "cassandra://10.0.1.25:9042/employee?username=scylla&password=12345"
+}
+
+# migrate install
+curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.0/migrate.linux-amd64.tar.gz | tar xvz
+sudo mv migrate /usr/local/bin/migrate
+
+# running migrations
+make run-migrations
+
+nohup go run main.go > api.log 2>&1 &
+
+
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable employee-api.service 
+sudo systemctl start employee-api.service 
+sudo systemctl status employee-api.service
+
+# service file for employee
+[Unit]
+Description=Employee API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/employee/employee-api
+ExecStart=nohup go run /home/ubuntu/employee/employee-api/main.go > api.log 2>&1 &
+
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+
+
+# working path for employee get
+
+curl http://10.0.2.75:8080/api/v1/employee/search/all
