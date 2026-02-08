@@ -1,0 +1,323 @@
+---- attendance------
+
+---
+postgres:
+  database: attendance_db
+  host: 10.0.1.25
+  port: 5432
+  user: postgres
+  password: 12345
+
+redis:
+  host: 10.0.1.25
+  port: 6379
+  password: ""
+
+----
+
+cat config.yaml 
+vi config.yaml 
+---
+postgres:
+  database: attendance_db
+  host: 10.0.1.25
+  port: 5432
+  user: postgres
+  password: 12345
+
+redis:
+  host: 10.0.1.25
+  port: 6379
+  password: ""
+
+
+sudo vi /etc/postgresql/*/main/postgresql.conf
+listen_addresses = '172.17.0.3'  # Replace with the DB server's network IP or *
+port = 5432
+
+sudo systemctl restart postgresql
+ sudo systemctl status postgresql
+
+sudo vi /etc/redis/redis.conf
+#
+# my settings
+#
+# my settings
+#
+bind 127.0.0.1 10.0.1.25 # second is redis server ip
+port 6379
+
+sudo systemctl daemon-reload
+sudo systemctl restart redis-server 
+sudo systemctl status redis-server  - active and running
+# check the redis-server connectivity from api server
+telnet 10.0.1.25 6379
+
+
+#changing redis password
+sudo vi /etc/redis/redis.conf
+bind 127.0.0.1 10.0.1.25 # second is redis server ip
+port 6379
+requirepass 12345  -> and with this api server can reach redis server
+
+
+# attendance api server
+
+vi liquibase.properties
+url=jdbc:postgresql://10.0.1.25:5432/attendance_db      # 10.0.1.25:5432 db server ip
+driver=org.postgresql.Driver
+username=postgres       # db server username
+password=12345           #db server password
+changeLogFile=migration/db.changelog-master.xml
+
+
+# POETRY
+poetry install
+poetry show
+
+o/p
+attrs                     23.1.0  Classes Without Boilerplate
+blinker                   1.6.2   Fast, simple object-to-object and broadca...
+cachelib                  0.9.0   A collection of cache libraries in the sa...
+click                     8.1.3   Composable command line interface toolkit
+coverage                  7.2.7   Code coverage measurement for Python
+flasgger                  0.9.7b2 Extract swagger specs from your flask pro...
+flask                     2.3.2   A simple framework for building complex w...
+flask-caching             2.0.2   Adds caching support to Flask applications.
+iniconfig                 2.0.0   brain-dead simple config-ini parsing
+itsdangerous              2.1.2   Safely pass data to untrusted environment...
+jinja2                    3.1.2   A very fast and expressive template engine.
+json-logging-py           0.2     JSON / Logstash formatters for Python log...
+jsonformatter             0.3.2   Python log in json format.
+jsonschema                4.17.3  An implementation of JSON Schema validati...
+markupsafe                2.1.3   Safely add untrusted strings to HTML/XML ...
+mistune                   3.0.1   A sane and fast Markdown parser with usef...
+packaging                 23.1    Core utilities for Python packages
+peewee                    3.16.2  a little orm
+pluggy                    1.2.0   plugin and hook calling mechanisms for py...
+prometheus-client         0.17.0  Python client for the Prometheus monitori...
+prometheus-flask-exporter 0.22.4  Prometheus metrics exporter for Flask
+psycopg2                  2.9.6   psycopg2 - Python-PostgreSQL Database Ada...
+pyrsistent                0.19.3  Persistent/Functional/Immutable data stru...
+pytest                    7.4.0   pytest: simple powerful testing with Python
+pytest-cov                4.1.0   Pytest plugin for measuring coverage.
+pytest-mock               3.11.1  Thin-wrapper around the mock package for ...
+python-json-logger        2.0.7   A python library adding a json log formatter
+pyyaml                    6.0     YAML parser and emitter for Python
+redis                     4.6.0   Python client for Redis database and key-...
+six                       1.16.0  Python 2 and 3 compatibility utilities
+voluptuous                0.13.1  
+werkzeug                  2.3.6   The comprehensive WSGI web application li...
+
+
+# activating venv
+ poetry env activate
+
+# make install
+sudo apt install make
+
+sudo cp liquibase /opt/liquibase
+
+echo 'export PATH="/opt/liquibase:$PATH"' >> ~/.bashrc
+exec bash
+
+# configfilelocation    
+ec
+
+
+# workling path for attend get
+curl http://10.0.2.75:8081/api/v1/attendance/search/all
+
+
+-----attendaceList.js--------
+
+import React from "react";
+import { Page, Grid, Table } from "tabler-react";
+import SiteWrapper from "./SiteWrapper.react";
+
+class ListEmployee extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { data: [] };
+  }
+
+  loadData() {
+    fetch("/api/v1/attendance/search/all")
+      .then(response => response.json())
+      .then(data => {
+        console.log("📥 Attendance list:", data);
+        this.setState({ data: data });
+      })
+      .catch(err => console.error("Fetch error:", err));
+  }
+
+  componentDidMount() {
+    this.loadData();
+  }
+
+  render() {
+    return (
+      <SiteWrapper>
+        <Page.Card title="Attendance List" />
+        <Grid.Col md={6} lg={10} className="align-self-center">
+          <Table>
+            <Table.Header>
+              <Table.ColHeader>Employee ID</Table.ColHeader>
+              <Table.ColHeader>Name</Table.ColHeader>
+              <Table.ColHeader>Status</Table.ColHeader>
+              <Table.ColHeader>Date</Table.ColHeader>
+            </Table.Header>
+            <Table.Body>
+              {this.state.data.map((item, i) => (
+                <Table.Row key={i}>
+                  <Table.Col>{item.id}</Table.Col>
+                  <Table.Col>{item.name}</Table.Col>
+                  <Table.Col>{item.status}</Table.Col>
+                  <Table.Col>{item.date}</Table.Col>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
+        </Grid.Col>
+      </SiteWrapper>
+    );
+  }
+}
+
+export default ListEmployee;
+
+
+-----attendance form-------
+
+import React from "react";
+import { Page, Grid } from "tabler-react";
+import SiteWrapper from "./SiteWrapper.react";
+import { Button, Form, FormGroup, Label, Input } from "reactstrap";
+import { withFormik } from "formik";
+
+/* ================= COMPONENT ================= */
+function AttendanceForm(props) {
+  const values = props.values;
+  const handleChange = props.handleChange;
+  const handleSubmit = props.handleSubmit;
+  const isSubmitting = props.isSubmitting;
+
+  return (
+    <SiteWrapper>
+      <Page.Card title="Employee Attendance"></Page.Card>
+
+      <Grid.Col md={6} lg={6} className="align-self-center">
+        <Form onSubmit={handleSubmit}>
+
+          <FormGroup>
+            <Label for="id">Employee ID</Label>
+            <Input
+              type="text"
+              name="id"
+              value={values.id}
+              onChange={handleChange}
+              required
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label for="name">Employee Name</Label>
+            <Input
+              type="text"
+              name="name"
+              value={values.name}
+              onChange={handleChange}
+              required
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <Label for="status">Status</Label>
+            <Input
+              type="select"
+              name="status"
+              value={values.status}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Select Status</option>
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+            </Input>
+          </FormGroup>
+
+          <FormGroup>
+            <Label for="date">Date</Label>
+            <Input
+              type="date"
+              name="date"
+              value={values.date}
+              onChange={handleChange}
+              required
+            />
+          </FormGroup>
+
+          <Button color="primary" disabled={isSubmitting}>
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </Button>
+
+        </Form>
+      </Grid.Col>
+    </SiteWrapper>
+  );
+}
+
+/* ================= FORMIK WRAPPER ================= */
+function mapPropsToValues() {
+  return {
+    id: "",
+    name: "",
+    status: "",
+    date: ""
+  };
+}
+
+function handleSubmit(values, formikBag) {
+  const resetForm = formikBag.resetForm;
+  const setSubmitting = formikBag.setSubmitting;
+
+  const payload = {
+    id: values.id.trim(),
+    name: values.name.trim(),
+    status: values.status.toLowerCase(),
+    date: values.date
+  };
+
+  console.log("📤 Sending Attendance:", payload);
+
+  fetch("/api/v1/attendance/create", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  })
+    .then(function (res) {
+      return res.text().then(function (text) {
+        console.log("📥 Server response:", text);
+        if (!res.ok) {
+          throw new Error(text || "Server error");
+        }
+        return text;
+      });
+    })
+    .then(function () {
+      alert("✅ Attendance successfully stored in database!");
+      resetForm();
+    })
+    .catch(function (err) {
+      console.error("❌ Submission error:", err);
+      alert("❌ Attendance NOT stored:\n" + err.message);
+    })
+    .finally(function () {
+      setSubmitting(false);
+    });
+}
+
+export default withFormik({
+  mapPropsToValues: mapPropsToValues,
+  handleSubmit: handleSubmit
+})(AttendanceForm);
